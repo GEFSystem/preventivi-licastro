@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 const euro = (n) => n.toLocaleString("it-IT", { style: "currency", currency: "EUR" });
 const arrotonda = (n) => Math.round(n * 100) / 100;
+const num = (n) => n.toLocaleString("it-IT", { maximumFractionDigits: 2 });
 
 function leggi(chiave, predefinito) {
   try {
@@ -23,14 +24,27 @@ function scrivi(chiave, valore) {
 }
 
 // ---------- Listino ----------
-const PRODOTTI = ["fuji-s", "fuji-m", "fuji-l"].map((id) => ({ id, ...window.LISTINO[id] }));
+// tipo: "griglia" (tabella larghezza × altezza per categoria), "doppia" (struttura + due teli),
+// "mq" (prezzo al metro quadro), "binario" (prezzo in base alla larghezza).
+const PRODOTTI = window.CATALOGO.map((id) => {
+  const p = window.LISTINO[id];
+  return { id, tipo: p.tipo || (p.teli === 2 ? "doppia" : "griglia"), ...p };
+});
 const prodottoCorrente = () => PRODOTTI.find((p) => p.id === $("prodotto").value);
+const categorieDi = (p) => Object.keys(p.griglie || {});
+const usaAltezza = (p) => p.tipo !== "binario";
+const usaCategoria = (p) => p.tipo === "griglia" || p.tipo === "doppia";
+const tuboDi = (p, l) => (p.tubo ? (l <= p.tubo.soglia ? p.tubo.sotto : p.tubo.sopra) : "");
 
 /**
- * Trova il prezzo di listino: si usa la misura di tabella uguale o immediatamente superiore.
+ * Prezzo da tabella larghezza × altezza: si usa la misura di tabella uguale o immediatamente superiore.
  * Restituisce { prezzo, lTab, hTab } oppure { errore }.
  */
 function cercaPrezzo(prodotto, categoria, larghezza, altezza) {
+  const griglia = prodotto.griglie[categoria];
+  if (!griglia) {
+    return { errore: `${prodotto.nome}: la categoria ${categoria} non è calcolabile dal listino (tabella non valida o assente). Chiedere preventivo.` };
+  }
   const larghezze = (prodotto.larghezzePer && prodotto.larghezzePer[categoria]) || prodotto.larghezze;
   const altezze = prodotto.altezze;
   const iL = larghezze.findIndex((l) => l >= larghezza);
@@ -41,7 +55,76 @@ function cercaPrezzo(prodotto, categoria, larghezza, altezza) {
   if (iH === -1) {
     return { errore: `Altezza oltre il massimo di listino (${altezze[altezze.length - 1]} cm): chiedere preventivo.` };
   }
-  return { prezzo: prodotto.griglie[categoria][iH][iL], lTab: larghezze[iL], hTab: altezze[iH] };
+  return { prezzo: griglia[iH][iL], lTab: larghezze[iL], hTab: altezze[iH] };
+}
+
+/**
+ * Calcola il prezzo base della tenda (senza motore e supplementi) per qualsiasi tipo di prodotto.
+ * Restituisce { prezzo, dettagli: [testo], avvisi: [testo] } oppure { errore }.
+ */
+function prezzoBase(p, scelte) {
+  const { larghezza, altezza, categoria, categoria2, variante } = scelte;
+  const avvisi = [];
+
+  if (p.tipo === "griglia") {
+    const r = cercaPrezzo(p, categoria, larghezza, altezza);
+    if (r.errore) return r;
+    const dett = [`Listino cat. ${categoria}, misura di tabella ${r.lTab} × ${r.hTab} cm: ${euro(r.prezzo)}`];
+    const tubo = tuboDi(p, r.lTab);
+    if (tubo) dett.push(tubo);
+    return { prezzo: r.prezzo, dettagli: dett, avvisi, lTab: r.lTab, hTab: r.hTab, tubo };
+  }
+
+  if (p.tipo === "doppia") {
+    const s = p.struttura;
+    const iS = s.larghezze.findIndex((l) => l >= larghezza);
+    if (iS === -1) return { errore: `Larghezza oltre il massimo della struttura (${s.larghezze[s.larghezze.length - 1]} cm): chiedere preventivo.` };
+    const t1 = cercaPrezzo(p, categoria, larghezza, altezza);
+    if (t1.errore) return t1;
+    const t2 = cercaPrezzo(p, categoria2, larghezza, altezza);
+    if (t2.errore) return t2;
+    const strutt = s.prezzi[iS];
+    return {
+      prezzo: strutt + t1.prezzo + t2.prezzo,
+      dettagli: [
+        `Struttura ${s.larghezze[iS]} cm: ${euro(strutt)}`,
+        `Telo 1 cat. ${categoria} (${t1.lTab} × ${t1.hTab}): ${euro(t1.prezzo)}`,
+        `Telo 2 cat. ${categoria2} (${t2.lTab} × ${t2.hTab}): ${euro(t2.prezzo)}`
+      ],
+      avvisi, lTab: t1.lTab, hTab: t1.hTab
+    };
+  }
+
+  if (p.tipo === "mq") {
+    const v = p.varianti.find((x) => x.id === variante);
+    const hConteggio = Math.max(altezza, p.altezzaMinima || 0);
+    const mqReali = (larghezza / 100) * (hConteggio / 100);
+    const mq = Math.max(mqReali, v.minimoMq || 0);
+    let prezzo = v.prezzo * mq;
+    const dett = [`${v.nome}: ${num(arrotonda(mq))} m² × ${euro(v.prezzo)}/m²`];
+    if (hConteggio > altezza) dett.push(`altezza conteggiata ${hConteggio} cm`);
+    if (mq > mqReali) dett.push(`minimo fatturabile ${num(v.minimoMq)} m²`);
+    const magg = (p.maggiorazioniLarghezza || []).find((m) => larghezza < m.sotto);
+    if (magg) {
+      prezzo *= 1 + magg.perc / 100;
+      dett.push(`maggiorazione +${magg.perc}% (larghezza inferiore a ${num(magg.sotto)} cm)`);
+    }
+    return { prezzo: arrotonda(prezzo), dettagli: dett, avvisi };
+  }
+
+  if (p.tipo === "binario") {
+    const lConteggio = Math.max(larghezza, p.minimoCm || 0);
+    const r = p.righe.find((x) => x.cm >= lConteggio);
+    if (!r) return { errore: `Larghezza oltre il massimo di listino (${p.righe[p.righe.length - 1].cm} cm): chiedere preventivo.` };
+    const parti = [`${r.cm} cm`];
+    if (r.cadute) parti.push(`${r.cadute} cadute`);
+    parti.push(`${r.supporti} supporti`);
+    const dett = [`Binario ${parti.join(", ")}: ${euro(r.prezzo)}`];
+    if (lConteggio > larghezza) dett.push(`minimo fatturabile ${p.minimoCm} cm`);
+    return { prezzo: r.prezzo, dettagli: dett, avvisi, lTab: r.cm };
+  }
+
+  return { errore: "Tipo di prodotto sconosciuto." };
 }
 
 // ---------- Impostazioni ----------
@@ -116,50 +199,128 @@ function leggiDalModulo() {
 
 // ---------- Configuratore ----------
 function riempiProdotti() {
+  const sel = $("prodotto");
+  let gruppo = null;
+  let og = null;
   for (const p of PRODOTTI) {
+    if (p.gruppo !== gruppo) {
+      gruppo = p.gruppo;
+      og = document.createElement("optgroup");
+      og.label = gruppo;
+      sel.appendChild(og);
+    }
     const o = document.createElement("option");
     o.value = p.id;
     o.textContent = p.nome;
-    $("prodotto").appendChild(o);
+    og.appendChild(o);
   }
 }
 
-function aggiornaAccessori() {
-  const sistema = prodottoCorrente().sistema;
-  const motoreSel = $("motore");
-  const precedente = motoreSel.value;
-  motoreSel.innerHTML = '<option value="">Nessuno (azionamento a catena)</option>';
-  for (const m of window.ACCESSORI.motori.filter((m) => m.sistemi.includes(sistema))) {
+function riempiSelect(sel, opzioni, precedente) {
+  sel.innerHTML = "";
+  for (const [valore, testo] of opzioni) {
     const o = document.createElement("option");
-    o.value = m.id;
-    o.textContent = `${m.nome} — ${euro(m.prezzo)}`;
-    motoreSel.appendChild(o);
+    o.value = valore;
+    o.textContent = testo;
+    sel.appendChild(o);
   }
-  if ([...motoreSel.options].some((o) => o.value === precedente)) motoreSel.value = precedente;
+  if (opzioni.some(([v]) => v === precedente)) sel.value = precedente;
+}
 
+const mostra = (id, visibile) => { $(id).style.display = visibile ? "" : "none"; };
+
+// supplementi disponibili per il prodotto (e la variante, se il supplemento è limitato ad alcune)
+function supplementiCorrenti() {
+  const p = prodottoCorrente();
+  return (p.supplementi || []).filter((s) => !s.varianti || s.varianti.includes($("variante").value));
+}
+
+function qtaPredefinita(s) {
+  if (s.unita === "ml") return arrotonda((Number($("larghezza").value) || 0) / 100);
+  if (s.unita === "mlh") return arrotonda((Number($("altezza").value) || 0) / 100);
+  return 1;
+}
+
+function etichettaUnita(s) {
+  return { pz: "pz", kit: "kit", cp: "coppia", ml: "ml", mlh: "ml", perc: "" }[s.unita] || s.unita;
+}
+
+function aggiornaCampi() {
+  const p = prodottoCorrente();
+
+  mostra("campo-categoria", usaCategoria(p));
+  mostra("campo-categoria2", p.tipo === "doppia");
+  mostra("campo-variante", p.tipo === "mq");
+  mostra("campo-altezza", usaAltezza(p));
+  $("l-categoria").textContent = p.tipo === "doppia" ? "Categoria telo 1" : "Categoria tessuto";
+
+  if (usaCategoria(p)) {
+    const cat = categorieDi(p).map((c) => [c, p.griglie[c] ? c : `${c} (non disponibile)`]);
+    riempiSelect($("categoria"), cat, $("categoria").value);
+    riempiSelect($("categoria2"), cat, $("categoria2").value);
+  }
+  if (p.tipo === "mq") {
+    $("l-variante").textContent = p.etichettaVariante || "Variante";
+    riempiSelect($("variante"), p.varianti.map((v) => [v.id, `${v.nome} — ${euro(v.prezzo)}/m²`]), $("variante").value);
+  }
+
+  const motori = (p.motori || []).map((id) => window.MOTORI.find((m) => m.id === id));
+  mostra("campo-motore", motori.length > 0);
+  riempiSelect($("motore"), [["", "Nessuno (azionamento a catena)"]].concat(motori.map((m) => [m.id, `${m.nome} — ${euro(m.prezzo)}`])), $("motore").value);
+
+  aggiornaSupplementi();
+}
+
+function aggiornaSupplementi() {
   const box = $("supplementi");
   box.innerHTML = "";
-  for (const s of window.ACCESSORI.supplementi.filter((s) => s.sistemi.includes(sistema))) {
+  const elenco = supplementiCorrenti();
+  mostra("campo-supplementi", elenco.length > 0);
+  elenco.forEach((s, i) => {
     const riga = document.createElement("label");
     riga.className = "supp";
-    riga.innerHTML = `
-      <input type="checkbox" data-id="${s.id}">
-      <span>${s.nome}</span>
-      <input type="number" class="qta" data-qta="${s.id}" min="0" step="${s.unita === "ml" ? "0.01" : "1"}" value="1" disabled
-        title="${s.unita === "ml" ? "metri lineari" : "quantità per tenda"}">
-      <span class="prezzo">${euro(s.prezzo)}/${s.unita}</span>`;
-    box.appendChild(riga);
-  }
-  box.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.dataset.i = i;
+    const nome = document.createElement("span");
+    nome.textContent = s.nome;
+    riga.append(cb, nome);
+    if (s.unita !== "perc") {
+      const qta = document.createElement("input");
+      qta.type = "number";
+      qta.className = "qta";
+      qta.dataset.qta = i;
+      qta.min = "0";
+      qta.step = s.unita === "ml" || s.unita === "mlh" ? "0.01" : "1";
+      qta.value = 1;
+      qta.disabled = true;
+      qta.title = s.unita === "ml" || s.unita === "mlh" ? "metri lineari" : "quantità per tenda";
+      qta.addEventListener("input", calcola);
+      riga.appendChild(qta);
+    }
+    const prezzo = document.createElement("span");
+    prezzo.className = "prezzo";
+    prezzo.textContent = s.unita === "perc" ? `+${s.prezzo}%` : `${euro(s.prezzo)}/${etichettaUnita(s)}`;
+    riga.appendChild(prezzo);
     cb.addEventListener("change", () => {
-      const qta = box.querySelector(`[data-qta="${cb.dataset.id}"]`);
-      qta.disabled = !cb.checked;
-      const s = window.ACCESSORI.supplementi.find((x) => x.id === cb.dataset.id);
-      if (cb.checked && s.unita === "ml") qta.value = arrotonda((Number($("larghezza").value) || 0) / 100);
+      const qta = box.querySelector(`[data-qta="${i}"]`);
+      if (qta) {
+        qta.disabled = !cb.checked;
+        if (cb.checked) qta.value = qtaPredefinita(s);
+      }
       calcola();
     });
+    box.appendChild(riga);
   });
-  box.querySelectorAll(".qta").forEach((q) => q.addEventListener("input", calcola));
+}
+
+// aggiorna i metri lineari dei supplementi "a metro" già selezionati quando cambiano le misure
+function aggiornaMetri() {
+  const elenco = supplementiCorrenti();
+  $("supplementi").querySelectorAll("input[type=checkbox]:checked").forEach((cb) => {
+    const s = elenco[cb.dataset.i];
+    if (s.unita === "ml" || s.unita === "mlh") $("supplementi").querySelector(`[data-qta="${cb.dataset.i}"]`).value = qtaPredefinita(s);
+  });
 }
 
 // Calcola la riga in base ai campi del configuratore. Restituisce la riga o null.
@@ -169,43 +330,64 @@ function calcola() {
   btn.disabled = true;
   esito.className = "esito";
 
-  const prodotto = prodottoCorrente();
-  const categoria = $("categoria").value;
-  const larghezza = Number($("larghezza").value);
-  const altezza = Number($("altezza").value);
+  const p = prodottoCorrente();
+  const scelte = {
+    larghezza: Number($("larghezza").value),
+    altezza: usaAltezza(p) ? Number($("altezza").value) : 0,
+    categoria: $("categoria").value,
+    categoria2: $("categoria2").value,
+    variante: $("variante").value
+  };
   const quantita = Math.max(1, Math.floor(Number($("quantita").value) || 1));
 
-  if (!larghezza || !altezza) {
-    esito.textContent = "Inserisci larghezza e altezza in centimetri.";
+  if (!scelte.larghezza || (usaAltezza(p) && !scelte.altezza)) {
+    esito.textContent = usaAltezza(p) ? "Inserisci larghezza e altezza in centimetri." : "Inserisci la larghezza in centimetri.";
     return null;
   }
-  const r = cercaPrezzo(prodotto, categoria, larghezza, altezza);
-  if (r.errore) {
+  const base = prezzoBase(p, scelte);
+  if (base.errore) {
     esito.classList.add("errore");
-    esito.textContent = r.errore;
+    esito.textContent = base.errore;
     return null;
   }
 
   const extra = [];
-  const motore = window.ACCESSORI.motori.find((m) => m.id === $("motore").value);
-  if (motore) extra.push({ nome: motore.nome, qta: 1, unita: "kit", prezzo: motore.prezzo });
+  const avvisi = base.avvisi.slice();
+  const motore = window.MOTORI.find((m) => m.id === $("motore").value && (p.motori || []).includes(m.id));
+  if (motore) {
+    extra.push({ nome: motore.nome, qta: 1, unita: "kit", prezzo: motore.prezzo, totale: motore.prezzo });
+    if (motore.max && (scelte.larghezza > motore.max[0] || scelte.altezza > motore.max[1])) {
+      avvisi.push(`il motore ${motore.id} è indicato fino a ${motore.max[0]}×${motore.max[1]} cm`);
+    }
+  }
+  const elenco = supplementiCorrenti();
   $("supplementi").querySelectorAll("input[type=checkbox]:checked").forEach((cb) => {
-    const s = window.ACCESSORI.supplementi.find((x) => x.id === cb.dataset.id);
-    const qta = Number($("supplementi").querySelector(`[data-qta="${s.id}"]`).value) || 0;
-    if (qta > 0) extra.push({ nome: s.nome, qta, unita: s.unita, prezzo: s.prezzo });
+    const s = elenco[cb.dataset.i];
+    if (s.unita === "perc") {
+      extra.push({ nome: s.nome, perc: s.prezzo, unita: "perc", totale: arrotonda(base.prezzo * s.prezzo / 100) });
+      return;
+    }
+    const qta = Number($("supplementi").querySelector(`[data-qta="${cb.dataset.i}"]`).value) || 0;
+    if (qta > 0) extra.push({ nome: s.nome, qta, unita: s.unita, prezzo: s.prezzo, totale: arrotonda(s.prezzo * qta) });
   });
 
-  const totExtra = extra.reduce((t, e) => t + e.prezzo * e.qta, 0);
-  const unitario = arrotonda(r.prezzo + totExtra);
+  const nota = p.note && p.note[scelte.categoria];
+  if (nota) avvisi.push(nota);
+  if (p.max && (scelte.larghezza > p.max[0] || scelte.altezza > p.max[1])) {
+    avvisi.push(`misura oltre le dimensioni massime indicate dal listino (${p.max[0]} × ${p.max[1]} cm)`);
+  }
+
+  const totExtra = extra.reduce((t, e) => t + e.totale, 0);
+  const unitario = arrotonda(base.prezzo + totExtra);
+  const tessuto = $("tessuto").value.trim();
   const riga = {
-    prodotto: prodotto.nome,
-    categoria,
-    tessuto: $("tessuto").value.trim(),
+    prodotto: p.nome,
+    titolo: titoloRiga(p, scelte, tessuto),
     riferimento: $("riferimento").value.trim(),
-    larghezza, altezza,
-    lTab: r.lTab, hTab: r.hTab,
-    tubo: prodotto.tubo ? prodotto.tubo(r.lTab) : "",
-    prezzoBase: r.prezzo,
+    larghezza: scelte.larghezza,
+    altezza: scelte.altezza,
+    dettagli: base.dettagli,
+    prezzoBase: base.prezzo,
     extra,
     quantita,
     unitario
@@ -214,23 +396,27 @@ function calcola() {
   esito.classList.add("ok");
   esito.innerHTML = "";
   const titolo = document.createElement("strong");
-  titolo.textContent = `Prezzo tenda: ${euro(unitario)}` + (quantita > 1 ? ` × ${quantita} = ${euro(unitario * quantita)}` : "");
+  titolo.textContent = `Prezzo: ${euro(unitario)}` + (quantita > 1 ? ` × ${quantita} = ${euro(unitario * quantita)}` : "");
   esito.appendChild(titolo);
   const dett = document.createElement("span");
   dett.className = "dett";
-  let testo = `Listino ${prodotto.nome} cat. ${categoria}, misura di tabella ${r.lTab} × ${r.hTab} cm: ${euro(r.prezzo)}`;
-  if (riga.tubo) testo += ` (${riga.tubo})`;
-  if (totExtra) testo += ` + motore/supplementi ${euro(totExtra)}`;
-  const nota = prodotto.note && prodotto.note[categoria];
-  if (nota) testo += `. Attenzione: ${nota}.`;
-  if (motore && motore.max && (larghezza > motore.max[0] || altezza > motore.max[1])) {
-    testo += ` Attenzione: il motore ${motore.id} è indicato fino a ${motore.max[0]}×${motore.max[1]} cm.`;
-  }
+  let testo = base.dettagli.join(" · ");
+  if (totExtra) testo += ` · motore/supplementi ${euro(totExtra)}`;
+  if (avvisi.length) testo += `. Attenzione: ${avvisi.join("; ")}.`;
   dett.textContent = testo;
   esito.appendChild(dett);
 
   btn.disabled = false;
   return riga;
+}
+
+function titoloRiga(p, scelte, tessuto) {
+  let t = p.nome;
+  if (p.tipo === "griglia") t += ` — tessuto cat. ${scelte.categoria}`;
+  if (p.tipo === "doppia") t += ` — teli cat. ${scelte.categoria} + ${scelte.categoria2}`;
+  if (p.tipo === "mq") t += ` — ${p.varianti.find((v) => v.id === scelte.variante).nome}`;
+  if (tessuto) t += ` (${tessuto})`;
+  return t;
 }
 
 function aggiungiRiga() {
@@ -249,16 +435,23 @@ function aggiungiRiga() {
 
 // ---------- Tabella e totali ----------
 function descrizione(r) {
-  const parti = [`${r.prodotto} — tessuto cat. ${r.categoria}${r.tessuto ? " (" + r.tessuto + ")" : ""}`];
-  let misura = `Misura ${r.larghezza} × ${r.altezza} cm`;
-  if (r.lTab !== r.larghezza || r.hTab !== r.altezza) misura += ` (listino ${r.lTab} × ${r.hTab})`;
-  if (r.tubo) misura += `, ${r.tubo}`;
-  const dettagli = [misura, `Tenda ${euro(r.prezzoBase)}`];
+  // righe salvate con la prima versione dell'app (solo Fuji)
+  if (!r.titolo) {
+    r = Object.assign({}, r, {
+      titolo: `${r.prodotto} — tessuto cat. ${r.categoria}${r.tessuto ? " (" + r.tessuto + ")" : ""}`,
+      dettagli: [`listino ${r.lTab} × ${r.hTab}${r.tubo ? ", " + r.tubo : ""}`]
+    });
+  }
+  const misura = r.altezza ? `Misura ${r.larghezza} × ${r.altezza} cm` : `Larghezza ${r.larghezza} cm`;
+  const dettagli = [misura].concat(r.dettagli);
   for (const e of r.extra) {
-    const q = e.unita === "ml" ? `${e.qta.toLocaleString("it-IT")} ml × ${euro(e.prezzo)}` : (e.qta !== 1 ? `${e.qta} × ${euro(e.prezzo)}` : euro(e.prezzo));
+    let q;
+    if (e.unita === "perc") q = `+${e.perc}% = ${euro(e.totale)}`;
+    else if (e.unita === "ml" || e.unita === "mlh") q = `${num(e.qta)} ml × ${euro(e.prezzo)}`;
+    else q = e.qta !== 1 ? `${num(e.qta)} × ${euro(e.prezzo)}` : euro(e.prezzo);
     dettagli.push(`${e.nome}: ${q}`);
   }
-  return { titolo: (r.riferimento ? r.riferimento + " — " : "") + parti[0], dettagli };
+  return { titolo: (r.riferimento ? r.riferimento + " — " : "") + r.titolo, dettagli };
 }
 
 function disegnaRighe() {
@@ -402,21 +595,15 @@ $("dlg-impostazioni").addEventListener("close", () => {
 
 // ---------- Avvio ----------
 riempiProdotti();
-aggiornaAccessori();
+aggiornaCampi();
 mostraAzienda();
 nuovoPreventivo();
 calcola();
 
-$("prodotto").addEventListener("change", () => { aggiornaAccessori(); calcola(); });
-["categoria", "larghezza", "altezza", "quantita", "motore"].forEach((id) => $(id).addEventListener("input", calcola));
-$("larghezza").addEventListener("input", () => {
-  // aggiorna i metri lineari dei supplementi "a metro" già selezionati
-  $("supplementi").querySelectorAll("input[type=checkbox]:checked").forEach((cb) => {
-    const s = window.ACCESSORI.supplementi.find((x) => x.id === cb.dataset.id);
-    if (s.unita === "ml") $("supplementi").querySelector(`[data-qta="${s.id}"]`).value = arrotonda((Number($("larghezza").value) || 0) / 100);
-  });
-  calcola();
-});
+$("prodotto").addEventListener("change", () => { aggiornaCampi(); calcola(); });
+$("variante").addEventListener("change", () => { aggiornaSupplementi(); calcola(); });
+["categoria", "categoria2", "quantita", "motore"].forEach((id) => $(id).addEventListener("input", calcola));
+["larghezza", "altezza"].forEach((id) => $(id).addEventListener("input", () => { aggiornaMetri(); calcola(); }));
 ["larghezza", "altezza", "quantita"].forEach((id) => $(id).addEventListener("keydown", (e) => {
   if (e.key === "Enter") aggiungiRiga();
 }));

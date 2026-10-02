@@ -47,9 +47,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--arancio); o
 
 fieldset { border: 1px solid var(--bordo); border-radius: 8px; margin: 14px 0 0; padding: 10px 14px; }
 legend { color: var(--tenue); font-size: 13px; padding: 0 4px; }
-.supplementi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; }
-.supp { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--testo); }
+.supplementi { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 6px 16px; }
+.supp { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--testo); }
 .supp input[type=checkbox] { width: auto; }
+.supp span:first-of-type { flex: 1; }
 .supp .qta { width: 70px; padding: 4px 6px; }
 .supp .prezzo { color: var(--tenue); font-size: 12px; margin-left: auto; white-space: nowrap; }
 

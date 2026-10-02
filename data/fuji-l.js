@@ -13,7 +13,6 @@ window.LISTINO["fuji-l"] = {
     D: [60, 80, 100, 120, 140, 160, 180, 200, 225, 240, 260, 280, 295]
   },
   altezze: [60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400],
-  tubo: function (larghezza) { return larghezza <= 295 ? "tubo 65 mm" : "tubo 80 mm"; },
   note: {
     C: "Categoria disponibile solo con profilo di premontaggio",
     D: "Categoria disponibile solo con profilo di premontaggio"
