@@ -229,6 +229,40 @@ function riempiSelect(sel, opzioni, precedente) {
 
 const mostra = (id, visibile) => { $(id).style.display = visibile ? "" : "none"; };
 
+// Menu dei tessuti raggruppati per categoria. Valore dell'opzione: "categoria|indice".
+function riempiTessuti(sel, p) {
+  const precedente = sel.value;
+  const tessuti = (window.TESSUTI && window.TESSUTI[p.id]) || {};
+  sel.innerHTML = "";
+  for (const cat of categorieDi(p)) {
+    const og = document.createElement("optgroup");
+    og.label = `Categoria ${cat}` + (p.griglie[cat] ? "" : " — non calcolabile, chiedere preventivo");
+    const elenco = tessuti[cat] && tessuti[cat].length ? tessuti[cat] : [{ nome: `Tessuto categoria ${cat}`, max: null }];
+    elenco.forEach((t, i) => {
+      const o = document.createElement("option");
+      o.value = `${cat}|${i}`;
+      o.textContent = `${t.nome} (cat. ${cat})` + (t.max ? ` — fino a ${t.max} cm` : "");
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  }
+  if ([...sel.options].some((o) => o.value === precedente)) sel.value = precedente;
+}
+
+// Restituisce { categoria, tessuto } dalla scelta del menu
+function tessutoScelto(sel, p) {
+  const [categoria, i] = sel.value.split("|");
+  const elenco = (window.TESSUTI && window.TESSUTI[p.id] && window.TESSUTI[p.id][categoria]) || [];
+  return { categoria, tessuto: elenco[Number(i)] || { nome: `Tessuto categoria ${categoria}`, max: null } };
+}
+
+function avvisoLarghezza(t, larghezza) {
+  if (!t.max || larghezza <= t.max) return null;
+  return t.saldabile
+    ? `${t.nome}: oltre ${t.max} cm il telo va capovolto e/o saldato`
+    : `${t.nome}: larghezza massima del tessuto ${t.max} cm`;
+}
+
 // supplementi disponibili per il prodotto (e la variante, se il supplemento è limitato ad alcune)
 function supplementiCorrenti() {
   const p = prodottoCorrente();
@@ -252,12 +286,11 @@ function aggiornaCampi() {
   mostra("campo-categoria2", p.tipo === "doppia");
   mostra("campo-variante", p.tipo === "mq");
   mostra("campo-altezza", usaAltezza(p));
-  $("l-categoria").textContent = p.tipo === "doppia" ? "Categoria telo 1" : "Categoria tessuto";
+  $("l-categoria").textContent = p.tipo === "doppia" ? "Tessuto telo 1" : "Tessuto";
 
   if (usaCategoria(p)) {
-    const cat = categorieDi(p).map((c) => [c, p.griglie[c] ? c : `${c} (non disponibile)`]);
-    riempiSelect($("categoria"), cat, $("categoria").value);
-    riempiSelect($("categoria2"), cat, $("categoria2").value);
+    riempiTessuti($("tessuto1"), p);
+    riempiTessuti($("tessuto2"), p);
   }
   if (p.tipo === "mq") {
     $("l-variante").textContent = p.etichettaVariante || "Variante";
@@ -331,11 +364,15 @@ function calcola() {
   esito.className = "esito";
 
   const p = prodottoCorrente();
+  const t1 = usaCategoria(p) ? tessutoScelto($("tessuto1"), p) : {};
+  const t2 = p.tipo === "doppia" ? tessutoScelto($("tessuto2"), p) : {};
   const scelte = {
     larghezza: Number($("larghezza").value),
     altezza: usaAltezza(p) ? Number($("altezza").value) : 0,
-    categoria: $("categoria").value,
-    categoria2: $("categoria2").value,
+    categoria: t1.categoria,
+    categoria2: t2.categoria,
+    tessuto1: t1.tessuto,
+    tessuto2: t2.tessuto,
     variante: $("variante").value
   };
   const quantita = Math.max(1, Math.floor(Number($("quantita").value) || 1));
@@ -371,8 +408,13 @@ function calcola() {
     if (qta > 0) extra.push({ nome: s.nome, qta, unita: s.unita, prezzo: s.prezzo, totale: arrotonda(s.prezzo * qta) });
   });
 
-  const nota = p.note && p.note[scelte.categoria];
-  if (nota) avvisi.push(nota);
+  for (const t of [scelte.tessuto1, scelte.tessuto2]) {
+    const a = t && avvisoLarghezza(t, scelte.larghezza);
+    if (a) avvisi.push(a);
+  }
+  if (usaCategoria(p) && ["C", "D"].includes(scelte.categoria) && /^fuji/.test(p.id)) {
+    avvisi.push("categoria disponibile solo con profilo di premontaggio");
+  }
   if (p.max && (scelte.larghezza > p.max[0] || scelte.altezza > p.max[1])) {
     avvisi.push(`misura oltre le dimensioni massime indicate dal listino (${p.max[0]} × ${p.max[1]} cm)`);
   }
@@ -412,8 +454,8 @@ function calcola() {
 
 function titoloRiga(p, scelte, tessuto) {
   let t = p.nome;
-  if (p.tipo === "griglia") t += ` — tessuto cat. ${scelte.categoria}`;
-  if (p.tipo === "doppia") t += ` — teli cat. ${scelte.categoria} + ${scelte.categoria2}`;
+  if (p.tipo === "griglia") t += ` — ${scelte.tessuto1.nome} (cat. ${scelte.categoria})`;
+  if (p.tipo === "doppia") t += ` — teli ${scelte.tessuto1.nome} (cat. ${scelte.categoria}) + ${scelte.tessuto2.nome} (cat. ${scelte.categoria2})`;
   if (p.tipo === "mq") t += ` — ${p.varianti.find((v) => v.id === scelte.variante).nome}`;
   if (tessuto) t += ` (${tessuto})`;
   return t;
@@ -602,7 +644,7 @@ calcola();
 
 $("prodotto").addEventListener("change", () => { aggiornaCampi(); calcola(); });
 $("variante").addEventListener("change", () => { aggiornaSupplementi(); calcola(); });
-["categoria", "categoria2", "quantita", "motore"].forEach((id) => $(id).addEventListener("input", calcola));
+["tessuto1", "tessuto2", "quantita", "motore"].forEach((id) => $(id).addEventListener("input", calcola));
 ["larghezza", "altezza"].forEach((id) => $(id).addEventListener("input", () => { aggiornaMetri(); calcola(); }));
 ["larghezza", "altezza", "quantita"].forEach((id) => $(id).addEventListener("keydown", (e) => {
   if (e.key === "Enter") aggiungiRiga();

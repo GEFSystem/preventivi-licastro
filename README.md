@@ -30,6 +30,7 @@ I preventivi salvati restano nel browser in cui sono stati creati.
 | Tenda doppia, Doppia Box | 126-133 | `data/tenda-doppia.js` |
 | Veneziane, verticali, plissé, binari | 136-158 | `data/altri.js` |
 | Catalogo motori, supplementi Fuji, ordine prodotti, dati azienda | 58 | `data/accessori.js` |
+| Tessuti per categoria con larghezze massime | sotto ogni tabella | `data/tessuti.js` |
 
 ### Note sul listino
 
