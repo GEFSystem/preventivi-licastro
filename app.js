@@ -168,7 +168,7 @@ function nuovoPreventivo() {
     data: new Date().toISOString().slice(0, 10),
     cliente: { nome: "", indirizzo: "", contatti: "" },
     righe: [],
-    variazione: Number(impostazioni.variazione) || 0,
+    variazione: Math.abs(Number(impostazioni.variazione) || 0),
     note: ""
   };
   caricaInModulo();
@@ -180,7 +180,7 @@ function caricaInModulo() {
   $("cliente-nome").value = preventivo.cliente.nome;
   $("cliente-indirizzo").value = preventivo.cliente.indirizzo;
   $("cliente-contatti").value = preventivo.cliente.contatti;
-  $("variazione").value = preventivo.variazione;
+  $("variazione").value = Math.abs(preventivo.variazione || 0);
   $("note").value = preventivo.note;
   disegnaRighe();
 }
@@ -193,7 +193,7 @@ function leggiDalModulo() {
     indirizzo: $("cliente-indirizzo").value.trim(),
     contatti: $("cliente-contatti").value.trim()
   };
-  preventivo.variazione = Number($("variazione").value) || 0;
+  preventivo.variazione = Math.min(100, Math.abs(Number($("variazione").value) || 0));
   preventivo.note = $("note").value;
 }
 
@@ -543,16 +543,17 @@ function disegnaRighe() {
 }
 
 function aggiornaTotali() {
-  const variazione = Number($("variazione").value) || 0;
+  // il campo "variazione" contiene lo sconto in percentuale (valore positivo)
+  const sconto = Math.min(100, Math.abs(Number($("variazione").value) || 0));
   const iva = Number(impostazioni.iva) || 0;
   const listino = arrotonda(preventivo.righe.reduce((t, r) => t + r.unitario * r.quantita, 0));
-  const delta = arrotonda(listino * variazione / 100);
+  const delta = -arrotonda(listino * sconto / 100);
   const imponibile = arrotonda(listino + delta);
   const impIva = arrotonda(imponibile * iva / 100);
 
   $("t-listino").textContent = euro(listino);
-  $("r-variazione").style.display = variazione ? "" : "none";
-  $("l-variazione").textContent = variazione > 0 ? `Ricarico ${variazione}%` : `Sconto ${-variazione}%`;
+  $("r-variazione").style.display = sconto ? "" : "none";
+  $("l-variazione").textContent = `Sconto ${sconto}%`;
   $("t-variazione").textContent = euro(delta);
   $("t-imponibile").textContent = euro(imponibile);
   $("l-iva").textContent = iva;
