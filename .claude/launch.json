@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "preventivi",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-ExecutionPolicy", "Bypass", "-File", "C:\\Users\\peppe\\OneDrive\\Documenti\\progetti\\preventivi-licastro\\serve.ps1"],
+      "port": 8080
+    }
+  ]
+}

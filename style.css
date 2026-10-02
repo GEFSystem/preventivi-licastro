@@ -1,0 +1,121 @@
+:root {
+  --arancio: #e9722e;
+  --marrone: #4f4842;
+  --sfondo: #f6f3f0;
+  --carta: #ffffff;
+  --testo: #2b2622;
+  --tenue: #7a716a;
+  --bordo: #e2dcd6;
+  --errore: #b3261e;
+  --ok: #2e7d4f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  background: var(--sfondo);
+  color: var(--testo);
+  font-size: 15px;
+}
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  background: var(--marrone); color: #fff; padding: 12px 20px;
+}
+.topbar nav { display: flex; gap: 8px; flex-wrap: wrap; }
+.topbar button { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); }
+
+.brand { display: flex; flex-direction: column; line-height: 1; color: var(--arancio); }
+.brand-name { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 26px; letter-spacing: 1px; }
+.brand-sub { font-size: 11px; font-weight: 700; letter-spacing: 2px; margin-top: 4px; }
+
+main { max-width: 1000px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+
+.card { background: var(--carta); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+h2 { margin: 0 0 14px; font-size: 18px; color: var(--marrone); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--tenue); }
+label small { font-weight: normal; }
+input, select, textarea {
+  font: inherit; color: var(--testo); padding: 8px 10px;
+  border: 1px solid var(--bordo); border-radius: 6px; background: #fff; width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--arancio); outline-offset: -1px; }
+
+fieldset { border: 1px solid var(--bordo); border-radius: 8px; margin: 14px 0 0; padding: 10px 14px; }
+legend { color: var(--tenue); font-size: 13px; padding: 0 4px; }
+.supplementi { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; }
+.supp { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--testo); }
+.supp input[type=checkbox] { width: auto; }
+.supp .qta { width: 70px; padding: 4px 6px; }
+.supp .prezzo { color: var(--tenue); font-size: 12px; margin-left: auto; white-space: nowrap; }
+
+.esito { margin-top: 14px; padding: 10px 14px; border-radius: 8px; background: var(--sfondo); min-height: 20px; }
+.esito.errore { background: #fdecea; color: var(--errore); }
+.esito.ok { background: #eaf5ee; color: var(--ok); }
+.esito .dett { color: var(--tenue); font-size: 13px; display: block; margin-top: 4px; }
+
+.azioni { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+button {
+  font: inherit; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--bordo); background: #fff; color: var(--testo);
+}
+button:hover { filter: brightness(.96); }
+button.primario { background: var(--arancio); border-color: var(--arancio); color: #fff; font-weight: 600; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.link { border: none; background: none; color: var(--errore); padding: 4px 8px; }
+
+/* Preventivo */
+.intestazione { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-bottom: 3px solid var(--arancio); padding-bottom: 12px; }
+.azienda { text-align: right; font-size: 12px; color: var(--tenue); line-height: 1.5; }
+.azienda strong { color: var(--testo); font-size: 14px; }
+.dati-preventivo { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+.dati-preventivo h2 { display: flex; align-items: center; gap: 6px; }
+.dati-preventivo p { margin: 0; display: flex; align-items: center; gap: 6px; }
+input.inline { width: auto; max-width: 160px; padding: 4px 6px; }
+.cliente { display: flex; flex-direction: column; gap: 6px; min-width: 260px; flex: 0 1 340px; }
+
+.righe { width: 100%; border-collapse: collapse; font-size: 14px; }
+.righe th { text-align: left; background: var(--sfondo); color: var(--marrone); padding: 8px; font-size: 12px; text-transform: uppercase; }
+.righe td { padding: 8px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
+.righe .det { color: var(--tenue); font-size: 12px; }
+.num { text-align: right; white-space: nowrap; }
+.vuoto { color: var(--tenue); text-align: center; padding: 16px; }
+
+.totali { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.totali label { max-width: 200px; }
+.totali table { margin-left: auto; border-collapse: collapse; min-width: 280px; }
+.totali td { padding: 4px 8px; }
+.totali .grande td { font-size: 18px; font-weight: 700; border-top: 2px solid var(--marrone); padding-top: 8px; }
+
+.note-label { margin-top: 16px; }
+.piccolo { font-size: 11px; color: var(--tenue); }
+
+dialog { border: none; border-radius: 10px; padding: 20px; width: min(520px, calc(100% - 32px)); }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog label { margin-bottom: 8px; }
+.lista { list-style: none; padding: 0; margin: 0 0 12px; max-height: 60vh; overflow: auto; }
+.lista li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--bordo); }
+.lista li span { flex: 1; }
+
+.brand-stampa { display: flex; }
+
+@media (max-width: 600px) {
+  .righe th:nth-child(1), .righe td:nth-child(1) { display: none; }
+  .azienda { text-align: left; }
+}
+
+@media print {
+  body { background: #fff; font-size: 12px; }
+  .no-print, .topbar, #configuratore { display: none !important; }
+  main { padding: 0; max-width: none; }
+  .card { box-shadow: none; padding: 0; }
+  input, textarea { border: none; padding: 0; resize: none; }
+  input::placeholder, textarea::placeholder { color: transparent; }
+  .righe th { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .intestazione { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .vuoto { display: none; }
+}

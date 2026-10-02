@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preventivi Licastro System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar no-print">
+    <div class="brand">
+      <span class="brand-name">LICASTRO</span>
+      <span class="brand-sub">S Y S T E M</span>
+    </div>
+    <nav>
+      <button type="button" id="btn-nuovo">Nuovo preventivo</button>
+      <button type="button" id="btn-archivio">Archivio</button>
+      <button type="button" id="btn-impostazioni">Impostazioni</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- CONFIGURATORE -->
+    <section class="card no-print" id="configuratore">
+      <h2>Aggiungi una tenda</h2>
+      <div class="grid">
+        <label>Prodotto
+          <select id="prodotto"></select>
+        </label>
+        <label>Categoria tessuto
+          <select id="categoria">
+            <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+          </select>
+        </label>
+        <label>Tessuto / colore <small>(facoltativo)</small>
+          <input id="tessuto" type="text" placeholder="es. Screen 3% bianco">
+        </label>
+        <label>Larghezza (cm)
+          <input id="larghezza" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+        <label>Altezza (cm)
+          <input id="altezza" type="number" min="1" step="1" inputmode="numeric">
+        </label>
+        <label>Quantità
+          <input id="quantita" type="number" min="1" step="1" value="1" inputmode="numeric">
+        </label>
+        <label>Riferimento <small>(facoltativo)</small>
+          <input id="riferimento" type="text" placeholder="es. Cucina">
+        </label>
+        <label>Motore
+          <select id="motore"></select>
+        </label>
+      </div>
+
+      <fieldset>
+        <legend>Supplementi</legend>
+        <div id="supplementi" class="supplementi"></div>
+      </fieldset>
+
+      <div class="esito" id="esito" aria-live="polite"></div>
+      <div class="azioni">
+        <button type="button" class="primario" id="btn-aggiungi" disabled>Aggiungi al preventivo</button>
+      </div>
+    </section>
+
+    <!-- PREVENTIVO (stampabile) -->
+    <section class="card foglio" id="preventivo">
+      <div class="intestazione">
+        <div class="brand brand-stampa">
+          <span class="brand-name">LICASTRO</span>
+          <span class="brand-sub">S Y S T E M</span>
+        </div>
+        <div class="azienda" id="azienda-box"></div>
+      </div>
+
+      <div class="dati-preventivo">
+        <div>
+          <h2>Preventivo n. <input id="numero" class="inline" type="text"></h2>
+          <p>Data: <input id="data" class="inline" type="date"></p>
+        </div>
+        <div class="cliente">
+          <strong>Cliente</strong>
+          <input id="cliente-nome" type="text" placeholder="Nome / Ragione sociale">
+          <input id="cliente-indirizzo" type="text" placeholder="Indirizzo">
+          <input id="cliente-contatti" type="text" placeholder="Telefono / email">
+        </div>
+      </div>
+
+      <table class="righe">
+        <thead>
+          <tr>
+            <th>#</th><th>Descrizione</th><th class="num">Q.tà</th>
+            <th class="num">Prezzo unit.</th><th class="num">Totale</th><th class="no-print"></th>
+          </tr>
+        </thead>
+        <tbody id="righe"></tbody>
+      </table>
+      <p class="vuoto" id="vuoto">Nessuna tenda inserita. Usa il riquadro "Aggiungi una tenda".</p>
+
+      <div class="totali">
+        <label class="no-print">Ricarico (+) / Sconto (−) %
+          <input id="variazione" type="number" step="0.5" value="0">
+        </label>
+        <table>
+          <tr><td>Totale listino</td><td class="num" id="t-listino"></td></tr>
+          <tr id="r-variazione"><td id="l-variazione"></td><td class="num" id="t-variazione"></td></tr>
+          <tr><td>Imponibile</td><td class="num" id="t-imponibile"></td></tr>
+          <tr><td>IVA <span id="l-iva"></span>%</td><td class="num" id="t-iva"></td></tr>
+          <tr class="grande"><td>Totale</td><td class="num" id="t-totale"></td></tr>
+        </table>
+      </div>
+
+      <label class="note-label">Note
+        <textarea id="note" rows="3" placeholder="Tempi di consegna, condizioni, montaggio…"></textarea>
+      </label>
+      <p class="piccolo">Misure in cm, intese come misura finita. Il prezzo di listino si calcola sulla misura di tabella uguale o immediatamente superiore. Prezzi IVA esclusa salvo dove indicato il totale.</p>
+
+      <div class="azioni no-print">
+        <button type="button" id="btn-salva">Salva</button>
+        <button type="button" class="primario" id="btn-stampa">Stampa / Salva PDF</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ARCHIVIO -->
+  <dialog id="dlg-archivio">
+    <h2>Preventivi salvati</h2>
+    <ul id="lista-archivio" class="lista"></ul>
+    <form method="dialog"><button>Chiudi</button></form>
+  </dialog>
+
+  <!-- IMPOSTAZIONI -->
+  <dialog id="dlg-impostazioni">
+    <form method="dialog" id="form-impostazioni">
+      <h2>Impostazioni</h2>
+      <label>Nome azienda <input name="nome"></label>
+      <label>Sede legale <input name="sedeLegale"></label>
+      <label>Sede operativa <input name="sedeOperativa"></label>
+      <label>Partita IVA <input name="piva"></label>
+      <label>Email <input name="email"></label>
+      <label>Telefoni <input name="telefoni"></label>
+      <label>Sito web <input name="sito"></label>
+      <label>Aliquota IVA % <input name="iva" type="number" step="1"></label>
+      <label>Ricarico/sconto predefinito % <input name="variazione" type="number" step="0.5"></label>
+      <div class="azioni">
+        <button value="annulla">Annulla</button>
+        <button value="salva" class="primario">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="data/fuji-s.js"></script>
+  <script src="data/fuji-m.js"></script>
+  <script src="data/fuji-l.js"></script>
+  <script src="data/accessori.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
